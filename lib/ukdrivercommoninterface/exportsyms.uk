@@ -1,0 +1,14 @@
+uk_gpio_initialize
+uk_gpio_read
+uk_gpio_write
+uk_gpio_setDirection
+uk_gpio_getDirection
+uk_gpio_setOutputEnable
+uk_gpio_getOutputEnable
+uk_gpio_getbankPin
+uk_gpio_readPin
+uk_gpio_writePin
+uk_gpio_setDirectionPin
+uk_gpio_getDirectionPin
+uk_gpio_setOutputEnablePin
+uk_gpio_getOutputEnablePin

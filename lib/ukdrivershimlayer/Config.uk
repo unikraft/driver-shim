@@ -1,0 +1,4 @@
+menuconfig LIBUKDRIVERSHIMLAYER
+	bool "ukdrivershimlayer: Driver shim layer for FreeRTOS porting"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
