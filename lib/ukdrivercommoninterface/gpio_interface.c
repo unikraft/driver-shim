@@ -41,39 +41,222 @@
 extern "C" {
 #endif
 
+/* List of registered devices */
+UK_TAILQ_HEAD(uk_gpio_list, struct uk_gpio);
 
-/* Initialization function */
-s32 uk_gpio_initialize(uk_gpio_data *ptr, uk_gpio_config *configPtr,
-			   uin32_t effectiveAddr)
+struct uk_gpio_list uk_gpio_list =
+UK_TAILQ_HEAD_INITIALIZER(uk_gpio_list);
+
+/* Number of registered devices */
+static uint16_t gpiodev_count;
+
+/* Private function to check if a device was registered with the driver */
+static int8_t check_gpio_device_registered(uint16_t id);
+
+/* Register device with the GPIO driver */
+uin32_t uk_gpio_drv_register(struct uk_gpio *dev)
 {
-    XGpioPs xilInstancePtr;
-    xilInstancePtr.GpioConfig = ptr.gpio_config;
-    xilInstancePtr.IsReady = ptr.ready;
-    xilInstancePtr.Handler = ptr.handler;
-    xilInstancePtr.CallBackRef = ptr.callback_ref;
-    xilInstancePtr.Platform = ptr.platform;
-    xilInstancePtr.MaxPinNum = ptr.maxPinNum;
-    xilInstancePtr.MaxBanks = ptr.maxbanks;
+    UK_ASSERT(dev);
 
-    XGpioPs_Config xilConfigPtr;
-    xilConfigPtr.deviceId = configPtr.DeviceId;
-    xilConfigPtr.baseAddr = configPtr.BaseAddr;
+    /* assert configuration */
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->bank_ops);
+    UK_ASSERT(dev->pin_ops);
 
-    return s32 XGpioPs_CfgInitialize(&xilInstancePtr, &xilConfigPtr, effectiveAddr);
+
+    /* Add device to device queue */
+    UK_TAILQ_INSERT_TAIL(&uk_gpio_list, dev, _list);
+    uk_pr_info("Registered gpio device: %u\n", dev->gpio_config.deviceId);
+
+    return gpiodev_count++;
 }
 
-uin32_t uk_gpio_read(uk_gpio_data *ptr, uin8_t bank)
-{
-    XGpioPs xilInstancePtr;
-    xilInstancePtr.GpioConfig = ptr.gpio_config;
-    xilInstancePtr.IsReady = ptr.ready;
-    xilInstancePtr.Handler = ptr.handler;
-    xilInstancePtr.CallBackRef = ptr.callback_ref;
-    xilInstancePtr.Platform = ptr.platform;
-    xilInstancePtr.MaxPinNum = ptr.maxPinNum;
-    xilInstancePtr.MaxBanks = ptr.maxbanks;
+/* Initialization function */
+uin32_t uk_gpio_initialize(struct uk_gpio *dev, uin32_t effectiveAddr)
+{   
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->bank_ops);
+    UK_ASSERT(dev->bank_ops.gpio_init);
+    UK_ASSERT(effectiveAddr != (uin32_t)0U);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    return dev->bank_ops.gpio_init(dev->gpio_data, effectiveAddr);
+    
+}
 
-    return XGpioPs_Read(&xilInstancePtr, bank);
+/* GPIO read function */
+uint32_t uk_gpio_read(uk_gpio *ptr, uin8_t bank)
+{
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->bank_ops);
+    UK_ASSERT(dev->bank_ops.read_data_register);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    return dev->bank_ops.read_data_register(dev->gpio_data, bank);
+}
+
+void uk_gpio_write(uk_gpio *ptr, uin8_t bank, uin32_t data)
+{
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->bank_ops);
+    UK_ASSERT(dev->bank_ops.write_data_register);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    dev->bank_ops.write_data_register(dev->gpio_data, bank);
+}
+
+void uk_gpio_setDirection(uk_gpio *ptr, uin8_t bank, uin32_t direction)
+{
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->bank_ops);
+    UK_ASSERT(dev->bank_ops.set_direction);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    dev->bank_ops.set_direction(dev->gpio_data, bank, direction);
+}
+
+uin32_t uk_gpio_getDirection(uk_gpio *ptr, uin8_t bank)
+{
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->bank_ops);
+    UK_ASSERT(dev->bank_ops.get_direction);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    return dev->bank_ops.get_direction(dev->gpio_data, bank);
+}
+
+void uk_gpio_setOutputEnable(uk_gpio *ptr, uin8_t bank, uin32_t opEnable)
+{
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->bank_ops);
+    UK_ASSERT(dev->bank_ops.set_output_enable);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    dev->bank_ops.set_output_enable(dev->gpio_data, bank, opEnable);
+}
+
+uin32_t uk_gpio_getOutputEnable(uk_gpio *ptr, uin8_t bank)
+{
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->bank_ops);
+    UK_ASSERT(dev->bank_ops.get_output_enable);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    return dev->bank_ops.get_output_enable(dev->gpio_data, bank);
+}
+
+void uk_gpio_getbankPin(struct uk_gpio *dev, uin8_t pinNumber,
+                            uin8_t *bankNumber, uin8_t *pinNumberInbank)
+{
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->bank_ops);
+    UK_ASSERT(dev->bank_ops.get_bank_pin);
+    UK_ASSERT(bankNumber);
+    UK_ASSERT(pinNumberInbank);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    dev->bank_ops.get_bank_pin(pinNumber, bankNumber, pinNumberInbank);
+}
+
+/* Deregister device from the GPIO driver */
+void uk_gpio_unregister(struct uk_gpio *dev)
+{
+    uint16_t id = dev->gpio_config.deviceId;
+
+    dev->callback_ref = NULL;
+
+    /* Remove device from queue */
+    UK_TAILQ_REMOVE(&uk_gpio_list, dev, _list);
+    gpiodev_count--;
+
+    uk_pr_info("Unregistered gpio device: %u\n",id);
+}
+
+/* Pin APIs */
+uin32_t uk_gpio_readPin(struct uk_gpio *dev, uin32_t pin)
+{
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->pin_ops);
+    UK_ASSERT(dev->pin_ops.read_data_pin);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    return dev->pin_ops.read_data_pin(dev->gpio_data, pin);
+}
+
+void uk_gpio_writePin(struct uk_gpio *dev, uin32_t pin, uin32_t data)
+{
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->pin_ops);
+    UK_ASSERT(dev->pin_ops.write_data_pin);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    dev->pin_ops.write_data_pin(dev->gpio_data, pin);
+}
+
+void uk_gpio_setDirectionPin(struct uk_gpio *dev, uin32_t pin, uin32_t direction)
+{
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->pin_ops);
+    UK_ASSERT(dev->pin_ops.set_direction_pin);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    dev->pin_ops.set_direction_pin(dev->gpio_data, pin, direction);
+}
+
+uin32_t uk_gpio_getDirectionPin(struct uk_gpio *dev, uin32_t pin)
+{
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->pin_ops);
+    UK_ASSERT(dev->pin_ops.get_direction_pin);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    return dev->pin_ops.get_direction_pin(dev->gpio_data, pin);
+}
+
+void uk_gpio_setOutputEnablePin(struct uk_gpio *dev, uin32_t pin, uin32_t opEnable)
+{
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->pin_ops);
+    UK_ASSERT(dev->pin_ops.set_output_enable_pin);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    dev->pin_ops.set_output_enable_pin(dev->gpio_data, pin, opEnable);
+}
+
+uin32_t uk_gpio_getOutputEnablePin(struct uk_gpio *dev, uin32_t pin)
+{
+    UK_ASSERT(dev);
+    UK_ASSERT(dev->gpio_data);
+    UK_ASSERT(dev->pin_ops);
+    UK_ASSERT(dev->pin_ops.get_output_enable_pin);
+    UK_ASSERT(check_gpio_device_registered(dev->gpio_data.deviceId) == 1);
+    
+    return dev->pin_ops.get_output_enable_pin(dev->gpio_data, pin);
+}
+
+static int8_t check_gpio_device_registered(uint16_t id)
+{
+    /* search the device in the device queue */
+    UK_TAILQ_FOREACH(dev, &uk_gpio_list, _list) {
+        if (dev->gpio_data.deviceId == id)
+            return 1;
+    }
+
+    uk_pr_info("GPIO device is not registered\n");
+    return 0;
 }
 
 

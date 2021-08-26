@@ -67,51 +67,130 @@ typedef void (*uk_gpio_handler) (void *callback_ref, uin32_t bank, uin32_t statu
 
 
 /**
- * This typedef contains configuration information for a device.
- */
-typedef struct {
-	uin16_t deviceId;		/**< Unique ID of device */
-	uin32_t baseAddr;		/**< Register base address */
-} uk_gpio_config;
-
-/**
  * The GPIO driver instance data. The user is required to allocate a
  * variable of this type for the GPIO device in the system. A pointer
  * to a variable of this type is then passed to the driver API functions.
  */
 typedef struct {
-	uk_gpio_config gpio_config;	    /**< Device configuration */
-	uin32_t ready;			        /**< Device is initialized and ready */
-	uk_gpio_handler handler;	    /**< Status handlers for all banks */
-	void *callback_ref; 		    /**< Callback ref for bank handlers */
-	uin32_t platform;			    /**< Platform data */
-	uin32_t maxPinNum;			    /**< Max pins in the GPIO device */
-	uin8_t maxbanks;			    /**< Max banks in a GPIO device */
+	uin16_t deviceId;          /**< Unique ID of device */
+    uin32_t baseAddr;          /**< Register base address */
+	uin32_t ready;			   /**< Device is initialized and ready */
+	uin32_t platform;	       /**< Platform data */
+	uin32_t maxPinNum;	       /**< Max pins in the GPIO device */
+	uin8_t maxbanks;	       /**< Max banks in a GPIO device */
+    uk_gpio_handler handler;   /**< Status handlers for all banks */
+    void *callback_ref;        /**< Callback ref for bank handlers */
 } uk_gpio_data;
 
+/* Bank API driver callback types */
+
+/* Driver callback type to read the data register of the specified GPIO bank.*/
+typedef int (*uk_gpio_read_t)(uk_gpio_data *ptr, uin8_t bank);
+
+/* Driver callback type to write to the data register of the specified GPIO bank */
+typedef void (*uk_gpio_write_t)(uk_gpio_data *ptr, uin8_t bank, uin32_t data);
+
+/* Driver callback type to set the direction of the pins of the specified GPIO Bank */
+typedef void (*uk_gpio_setDirection_t)(uk_gpio_data *ptr,
+                uin8_t bank, uin32_t direction);
+
+/* Driver callback type to get the direction of the pins of the specified GPIO Bank */
+typedef uint32_t (*uk_gpio_getDirection_t)(uk_gpio_data *ptr, uin8_t bank);
+
+/* Driver callback type to set the output enable of the pins of the specified GPIO Bank.*/
+typedef void (uk_gpio_setOutputEnable_t)(uk_gpio_data *ptr, uin8_t bank, uin32_t opEnable);
+
+/* Driver callback type to get the output enable of the pins of the specified GPIO Bank. */
+typedef uin32_t (uk_gpio_getOutputEnable_t)(uk_gpio_data *ptr, uin8_t bank);
+
+/** Driver callback type to get the bank and pin number in the bank, for the given pin number 
+ * in the GPIO device. */
+typedef void (uk_gpio_getbankPin_t)(uin8_t pinNumber, uin8_t *bankNumber, uin8_t *pinNumberInbank);
+
+/* Driver callback type for device initialization */
+typedef uin32_t (uk_gpio_initialize_t)(uk_gpio_data *ptr, uin32_t effectiveAddr);
+
+typedef struct 
+{
+    uk_gpio_read_t              read_data_register;
+    uk_gpio_write_t             write_data_register;
+    uk_gpio_setDirection_t      set_direction;
+    uk_gpio_getDirection_t      get_direction;
+    uk_gpio_setOutputEnable_t   set_output_enable;
+    uk_gpio_getOutputEnable_t   get_output_enable;
+    uk_gpio_getbankPin_t        get_bank_pin;
+    uk_gpio_initialize_t        gpio_init;
+} uk_gpio_bank_ops;
+
+/* Pin APIs driver callback types */
+
+/* Driver callback type to read the data of the specified pin.*/
+typedef uin32_t (uk_gpio_readPin_t)(uk_gpio_data *ptr, uin32_t pin);
+
+/* Driver callback type to write to the data register of the specified pin */
+typedef void (uk_gpio_writePin_t)(uk_gpio_data *ptr, uin32_t pin, uin32_t data);
+
+/* Driver callback type to set the direction of the pins of the specified pin */
+typedef void (uk_gpio_setDirectionPin_t)(uk_gpio_data *ptr, uin32_t pin, uin32_t direction);
+
+/* Driver callback type to get the direction of the pins of the specified pin */
+typedef uin32_t (uk_gpio_getDirectionPin_t)(uk_gpio_data *ptr, uin32_t pin);
+
+/* Driver callback type to set the output enable of the pins of the specified pin.*/
+typedef void (uk_gpio_setOutputEnablePin_t)(uk_gpio_data *ptr, uin32_t pin, uin32_t opEnable);
+
+/* Driver callback type to get the output enable of the pins of the specified pin. */
+typedef uin32_t (uk_gpio_getOutputEnablePin_t)(uk_gpio_data *ptr, uin32_t pin);
+
+typedef struct
+{
+    uk_gpio_readPin_t               read_data_pin;
+    uk_gpio_writePin_t              write_data_pin;
+    uk_gpio_setDirectionPin_t       set_direction_pin;
+    uk_gpio_getDirectionPin_t       get_direction_pin;
+    uk_gpio_setOutputEnablePin_t    set_output_enable_pin;
+    uk_gpio_getOutputEnablePin_t    get_output_enable_pin;
+} uk_gpio_pin_ops;
+
+struct uk_gpio
+{
+    /* GPIO driver data information */
+    uk_gpio_data        gpio_data;
+    /* GPIO bank APIs */
+    uk_gpio_bank_ops    bank_ops;
+    /* GPIO pin APIs */
+    uk_gpio_pin_ops     pin_ops;
+    /* Entry for list of block devices */
+    UK_TAILQ_ENTRY(struct uk_gpio) _list;
+};
 
 /************************** Function Prototypes ******************************/
 
+/* Registration function */
+uin32_t uk_gpio_drv_register(struct uk_gpio *dev);
+
+/* Deregister device from the GPIO driver */
+void uk_gpio_unregister(struct uk_gpio *dev);
+
 /* Initialization function */
-s32 uk_gpio_initialize(uk_gpio_data *ptr, uk_gpio_config *configPtr,
-			   uin32_t effectiveAddr);
+uin32_t uk_gpio_initialize(struct uk_gpio *dev, uin32_t effectiveAddr);
 
 /* Bank APIs */
-uin32_t uk_gpio_read(uk_gpio_data *ptr, uin8_t bank);
-void uk_gpio_write(uk_gpio_data *ptr, uin8_t bank, uin32_t data);
-void uk_gpio_setDirection(uk_gpio_data *ptr, uin8_t bank, uin32_t direction);
-uin32_t uk_gpio_getDirection(uk_gpio_data *ptr, uin8_t bank);
-void uk_gpio_setOutputEnable(uk_gpio_data *ptr, uin8_t bank, uin32_t opEnable);
-uin32_t uk_gpio_getOutputEnable(uk_gpio_data *ptr, uin8_t bank);
-void uk_gpio_getbankPin(uin8_t pinNumber, uin8_t *bankNumber, uin8_t *pinNumberInbank);
+uin32_t uk_gpio_read(struct uk_gpio *dev, uin8_t bank);
+void uk_gpio_write(struct uk_gpio *dev, uin8_t bank, uin32_t data);
+void uk_gpio_setDirection(struct uk_gpio *dev, uin8_t bank, uin32_t direction);
+uin32_t uk_gpio_getDirection(struct uk_gpio *dev, uin8_t bank);
+void uk_gpio_setOutputEnable(struct uk_gpio *dev, uin8_t bank, uin32_t opEnable);
+uin32_t uk_gpio_getOutputEnable(struct uk_gpio *dev, uin8_t bank);
+void uk_gpio_getbankPin(struct uk_gpio *dev, uin8_t pinNumber, uin8_t *bankNumber, uin8_t *pinNumberInbank);
 
 /* Pin APIs */
-uin32_t uk_gpio_readPin(uk_gpio_data *ptr, uin32_t pin);
-void uk_gpio_writePin(uk_gpio_data *ptr, uin32_t pin, uin32_t data);
-void uk_gpio_setDirectionPin(uk_gpio_data *ptr, uin32_t pin, uin32_t direction);
-uin32_t uk_gpio_getDirectionPin(uk_gpio_data *ptr, uin32_t pin);
-void uk_gpio_setOutputEnablePin(uk_gpio_data *ptr, uin32_t pin, uin32_t opEnable);
-uin32_t uk_gpio_getOutputEnablePin(uk_gpio_data *ptr, uin32_t pin);
+uin32_t uk_gpio_readPin(struct uk_gpio *dev, uin32_t pin);
+void uk_gpio_writePin(struct uk_gpio *dev, uin32_t pin, uin32_t data);
+void uk_gpio_setDirectionPin(struct uk_gpio *dev, uin32_t pin, uin32_t direction);
+uin32_t uk_gpio_getDirectionPin(struct uk_gpio *dev, uin32_t pin);
+void uk_gpio_setOutputEnablePin(struct uk_gpio *dev, uin32_t pin, uin32_t opEnable);
+uin32_t uk_gpio_getOutputEnablePin(struct uk_gpio *dev, uin32_t pin);
 
 
 #ifdef __cplusplus
