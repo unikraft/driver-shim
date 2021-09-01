@@ -1,3 +1,5 @@
+uk_gpio_drv_register
+uk_gpio_unregister
 uk_gpio_initialize
 uk_gpio_read
 uk_gpio_write
