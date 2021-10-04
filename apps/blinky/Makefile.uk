@@ -1,0 +1,3 @@
+$(eval $(call addlib,appblinky))
+
+APPBLINKY_SRCS-y += $(APPBLINKY_BASE)/main.c

@@ -1,4 +1,4 @@
-menuconfig LIBUKDRIVERSCOMMONINTERFACE
+menuconfig LIBUKDRIVERCOMMONINTERFACE
 	bool "ukdrivercommoninterface: general driver API to be used by applications in spite of underlying platform"
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
